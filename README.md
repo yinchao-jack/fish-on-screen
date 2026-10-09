@@ -6,6 +6,8 @@
 
 一个以 **Vibe Coding 屏保水族馆** 为主题的浏览器交互项目，使用 Three.js 与 XPBD 约束模拟斗鱼的身体和鱼鳍。纯静态部署，模型、背景、音乐和运行依赖均随仓库提供。
 
+**在线体验 → [打开 Fish on Screen 水族馆](https://yinchao-jack.github.io/fish-on-screen/)**
+
 ## 我的水族箱
 
 ![音乐、斗鱼、场景三组 UI 控件](docs/images/ui-controls.png)
@@ -40,7 +42,7 @@ python3 -m http.server 8080 --directory dist
 
 将 `dist/` 的内容部署到任意支持静态文件的服务器即可。所有资源使用相对路径，可部署在子目录下。
 
-如使用 GitHub Pages，可选择从 `main` 分支的仓库根目录发布；根目录的 `index.html` 会引导至 `dist/`。
+本仓库已启用 GitHub Pages，从 `main` 分支的仓库根目录发布；根目录的 `index.html` 会引导至 `dist/`。推送更新后，GitHub 会自动重新部署。
 
 ## 项目结构
 
