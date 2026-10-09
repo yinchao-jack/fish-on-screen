@@ -1,0 +1,182 @@
+<!DOCTYPE html><html lang="zh-CN"><head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml"/>
+<meta name="description" content="Fish on Screen — 沉浸式斗鱼水族箱，点击引导游动，自由巡游，切换海洋背景和斗鱼配色。"/>
+<title>Fish on Screen</title>
+<style>
+  @font-face {
+    font-family: 'Pinyon Script';
+    src: url('./vendor/fonts/pinyon-script.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Caveat';
+    src: url('./vendor/fonts/caveat.woff2') format('woff2');
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0810; }
+  #app { width: 100%; height: 100%; }
+  canvas { display: block; }
+
+  #brand {
+    position: fixed; top: 20px; left: 26px; z-index: 10;
+    width: 155px; pointer-events: none;
+    color:#d2eff7; letter-spacing:.14em; text-shadow:0 2px 14px #071a2a;
+  }
+
+  #loading {position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 40%,#173f50 0%,#0a2334 42%,#071624 100%);color:#e8f5f3;transition:opacity .65s;}
+  .loading-pond {position:relative;width:192px;height:192px;margin-bottom:28px;transition:transform .5s cubic-bezier(.34,1.56,.64,1);}
+  .loading-orbit {position:absolute;inset:0;animation:pond-orbit 3.8s infinite;transform-origin:50% 50%;will-change:transform;}
+  .loading-orbit svg {width:100%;height:100%;overflow:visible;}
+  .orbit-track {fill:none;stroke:#b9e4df14;stroke-width:1.5;}
+  #loadBar {fill:none;stroke:url(#loading-gradient);stroke-width:3;stroke-linecap:round;stroke-dasharray:339.292;stroke-dashoffset:339.292;transition:stroke-dashoffset .5s ease;}
+  .orbit-dot {fill:#e8c9d9;}
+  .loading-fish {position:absolute;width:128px;height:128px;left:32px;top:32px;animation:fish-float 2.3s ease-in-out infinite;filter:drop-shadow(0 12px 12px #03101a38);will-change:transform;}
+  .loading-bubble {position:absolute;border:1px solid #c7eee960;border-radius:50%;animation:bubble-drift 2.5s ease-in-out infinite;}
+  .loading-bubble.one {width:9px;height:9px;left:8px;top:57px;}
+  .loading-bubble.two {width:5px;height:5px;right:12px;bottom:29px;animation-delay:-1.1s;}
+  .loading-bubble.three {width:6px;height:6px;left:36px;bottom:13px;animation-delay:-.7s;}
+  .loading-brand {font-size:26px;font-weight:600;letter-spacing:.19em;text-align:center;}
+  .loading-brand span {display:block;font-size:11px;font-weight:400;letter-spacing:.32em;margin-top:9px;color:#9cc6cd;}
+  #loading-status {font-size:13px;letter-spacing:.05em;margin-top:25px;color:#a7cbd0;min-height:21px;}
+  #loading-percent {font-size:11px;font-variant-numeric:tabular-nums;letter-spacing:.1em;color:#729ba7;margin-top:10px;}
+  #loading.is-ready .loading-pond {transform:scale(1.08);}
+  #loading.is-ready #loading-status {color:#d5eee4;}
+  #loading.has-error .loading-orbit,#loading.has-error .loading-fish {animation-play-state:paused;}
+  @keyframes pond-orbit {0%{transform:rotate(-90deg) scale(1);}35%{transform:rotate(90deg) scale(.94);}55%{transform:rotate(210deg) scale(1.06);}72%{transform:rotate(250deg) scale(.98);}100%{transform:rotate(270deg) scale(1);}}
+  @keyframes fish-float {0%,100%{transform:translateY(3px) rotate(-4deg) scale(1,.98);}50%{transform:translateY(-5px) rotate(3deg) scale(.99,1.02);}}
+  @keyframes bubble-drift {0%,100%{transform:translateY(4px);opacity:.35;}50%{transform:translateY(-7px);opacity:.85;}}
+  @media(prefers-reduced-motion:reduce) {.loading-orbit,.loading-fish,.loading-bubble {animation:none;}#loadBar {transition:none;}}
+
+  body {font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; color:#edfaff;}
+  button {font:inherit; color:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent;}
+  button:focus-visible {outline:2px solid #b9ebff;outline-offset:3px;}
+  button:disabled {opacity:.35;cursor:default;}
+  .settings-toggle {position:fixed;z-index:11;right:24px;top:24px;width:46px;height:46px;border:1px solid #b4e1ff40;border-radius:50%;background:#09263980;backdrop-filter:blur(18px);box-shadow:0 8px 30px #0003;display:grid;place-items:center;transition:background .2s;}
+  .settings-toggle:hover {background:#1a4861bd;}
+  .settings-toggle svg {width:24px;height:24px;}
+  .settings-toggle[aria-expanded=true] {visibility:hidden;}
+  .panel {position:fixed;z-index:12;top:24px;right:24px;width:350px;max-height:calc(100dvh - 48px);overflow-y:auto;padding:24px;background:linear-gradient(145deg,#12354ced,#071d30ed);border:1px solid #c2e7ff30;border-radius:22px;box-shadow:0 16px 70px #0005;scrollbar-width:thin;scrollbar-color:#91bed344 transparent;}
+  .panel::-webkit-scrollbar {width:4px;}
+  .panel::-webkit-scrollbar-thumb {background:#91bed344;border-radius:4px;}
+  [hidden] {display:none!important;}
+  .panel-header {display:flex;justify-content:space-between;align-items:center;margin-bottom:26px;}
+  .eyebrow {font-size:12px;letter-spacing:.18em;color:#8bc5dd;margin-bottom:7px;}
+  h1 {font-size:21px;font-weight:500;letter-spacing:.05em;}
+  .close {width:32px;height:32px;font-size:25px;border:0;border-radius:50%;background:#ffffff0c;color:#a9ccda;}
+  section {margin-bottom:23px;}
+  h2 {font-size:14px;font-weight:500;color:#b7d4df;margin-bottom:12px;}
+  .panel button:not(.close) {font-size:14px;}
+  .background-options {display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .background-options button,.shape-options button,.fish-chip,.actions button {padding:10px 8px;background:#ffffff05;border:1px solid #bdddfb24;border-radius:10px;transition:background .15s,border-color .15s;}
+  .panel button:hover:not(:disabled) {background-color:#ffffff12;}
+  .panel button[aria-pressed=true] {border-color:#a4def5aa;background:#81cfff18;box-shadow:inset 0 0 0 1px #82c4dd22;}
+  .section-heading {display:flex;align-items:baseline;justify-content:space-between;}
+  .section-heading span {font-size:12px;color:#7da6bb;}
+  .fish-list {display:flex;gap:7px;flex-wrap:wrap;}
+  .fish-chip {flex:1 0 72px;}
+  .note {font-size:13px;color:#85abbd;line-height:1.6;margin-top:10px;}
+  .palette-options {display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .palette-option {border:1px solid transparent;background:transparent;border-radius:12px;padding:8px 4px;display:flex;align-items:center;flex-direction:column;gap:7px;color:#b8d1dc;}
+  .swatch {display:block;width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 30% 23%,var(--light),var(--accent) 55%,var(--dark));box-shadow:inset 0 0 0 1px #fff4,0 2px 12px #0003;}
+.random-palette {width:100%;margin-top:12px;padding:11px;border:1px solid #bdddfb38;border-radius:10px;background:#ffffff08;color:#d5eaf3;}
+  .shape-options {display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .actions {display:flex;gap:8px;padding-top:5px;}
+  .actions button {flex:1;}
+  .actions .primary {background:#93d4ec;color:#082739;border-color:#addcef;}
+  .actions .primary:hover:not(:disabled) {background:#bae7f7;}
+  .gesture-hint {pointer-events:none;position:fixed;bottom:28px;left:50%;transform:translateX(-50%);text-align:center;color:#c3dfef;font-size:14px;letter-spacing:.05em;text-shadow:0 2px 10px #00111a;transition:opacity 1.5s;white-space:nowrap;}
+  .gesture-hint span {display:block;font-size:12px;color:#779eb5;margin-top:8px;}
+  .gesture-hint.dismissed {opacity:0;}
+  .retry {margin-top:24px;padding:10px 20px;border:1px solid #91ccdf88;border-radius:8px;background:#0b344d;font-size:16px;}
+  @media(max-width:480px) {.settings-toggle {top:20px;right:18px;}.panel{top:16px;right:16px;width:min(320px,calc(100vw - 32px));max-height:calc(100dvh - 32px);padding:20px;}.gesture-hint{bottom:30px;}#brand{left:22px;}}
+  @media(prefers-reduced-motion:reduce) {button,.gesture-hint,#loading {transition:none;}}
+
+  #brand span {display:block;font-size:22px;font-weight:600;line-height:1.1;}
+  #brand small {display:block;font-size:10px;letter-spacing:.18em;margin-top:5px;color:#99c1d3;}
+  #brand {display:flex;align-items:center;gap:10px;width:auto;}
+  .brand-logo {width:42px;height:42px;filter:drop-shadow(0 2px 8px #06162435);}
+  .panel-header {margin-bottom:19px;}
+  .tabs {display:flex;gap:4px;padding:4px;background:#0002;border-radius:12px;margin-bottom:22px;}
+  .tabs button {flex:1;border:0;background:transparent;padding:9px 4px;border-radius:9px;color:#8eafc0;}
+  .tabs button[aria-selected=true] {color:#e3f7ff;background:#8fcde520;}
+  .background-options {gap:10px;}
+  .background-options button {padding:0;overflow:hidden;text-align:left;background:#102b3c;}
+  .background-options img {display:block;width:100%;aspect-ratio:1.55;object-fit:cover;filter:brightness(.75);}
+  .background-options span {display:block;padding:10px;font-size:14px;}
+  .background-options button[aria-pressed=true] img {filter:brightness(.95);}
+  .field-label {display:block;font-size:14px;color:#b7d4df;margin-bottom:10px;}
+  select {font:inherit;font-size:14px;width:100%;padding:12px;background:#0b2639;color:#dcf2ff;border:1px solid #a9d2e233;border-radius:10px;}
+  select:focus-visible,input:focus-visible,.upload-button:focus-within {outline:2px solid #b9ebff;outline-offset:3px;}
+  .music-toggle {width:100%;padding:12px;border-radius:10px;background:#93d4ec;color:#082739;border:1px solid #addcef;margin-top:12px;}
+  .music-toggle[aria-pressed=true] {color:#d6f4ff;}
+  #volume-value {font-size:14px;color:#a9d2e2;}
+  input[type=range] {width:100%;accent-color:#a1d8ed;cursor:pointer;}
+  .upload-button {display:block;padding:13px;border:1px dashed #a9d2e244;border-radius:10px;font-size:14px;text-align:center;cursor:pointer;color:#c5e7f4;}
+  .upload-button:has(+input:focus-visible) {outline:2px solid #b9ebff;outline-offset:3px;}
+  .file-input {position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden;}
+  .local-music {margin-top:30px;}
+  #custom-file-name {overflow-wrap:anywhere;}
+  .note:empty {display:none;}
+  @media(max-width:480px){.panel {width:calc(100vw - 32px);max-width:350px;}#brand {width:130px;}#brand span{font-size:19px;}}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/addons/"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="app" role="img" aria-label="3D 斗鱼水族箱。点击引导选中的斗鱼，平时自由巡游，滚轮缩放。"></div>
+  <div id="brand" aria-label="Fish on Screen"><img src="./fish-logo.svg" class="brand-logo" alt=""><div><span>FISH</span><small>ON SCREEN</small></div></div>
+  <video id="bgvid" src="./bg_loop.mp4" autoplay="" muted="" loop="" playsinline="" style="display:none"></video>
+  <div id="loading" aria-label="正在加载 Fish on Screen">
+    <div class="loading-pond" id="loading-progress" role="progressbar" aria-label="水族箱加载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div class="loading-orbit" aria-hidden="true"><svg viewBox="0 0 128 128"><defs><linearGradient id="loading-gradient" x1="10" y1="10" x2="110" y2="110" gradientUnits="userSpaceOnUse"><stop stop-color="#a4e6de"/><stop offset=".52" stop-color="#c6def3"/><stop offset="1" stop-color="#f0c5d7"/></linearGradient></defs><circle class="orbit-track" cx="64" cy="64" r="54"/><circle id="loadBar" cx="64" cy="64" r="54"/><circle class="orbit-dot" cx="118" cy="64" r="3.3"/></svg></div>
+      <img class="loading-fish" src="./fish-logo.svg" alt="一条微笑的小斗鱼">
+      <i class="loading-bubble one" aria-hidden="true"></i><i class="loading-bubble two" aria-hidden="true"></i><i class="loading-bubble three" aria-hidden="true"></i>
+    </div>
+    <div class="loading-brand">FISH<span>ON SCREEN</span></div>
+    <p id="loading-status" role="status">正在唤醒小斗鱼…</p><span id="loading-percent" aria-hidden="true">0%</span>
+  </div>
+  <button id="settings-toggle" class="settings-toggle" aria-label="打开水族箱设置" aria-controls="settings-panel" aria-expanded="false" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="currentColor" stroke="none"/><circle cx="15" cy="17" r="3" fill="currentColor" stroke="none"/></svg>
+  </button>
+  <aside id="settings-panel" class="panel" aria-label="水族箱设置" hidden>
+    <div class="panel-header"><div><p class="eyebrow">FISH ON SCREEN</p><h1>我的水族箱</h1></div><button id="close-panel" class="close" aria-label="收起设置" type="button">×</button></div>
+    <div class="tabs" role="tablist" aria-label="设置分类">
+      <button type="button" id="tab-scene" role="tab" aria-selected="true" aria-controls="view-scene" tabindex="0">场景</button>
+      <button type="button" id="tab-fish" role="tab" aria-selected="false" aria-controls="view-fish" tabindex="-1">斗鱼</button>
+      <button type="button" id="tab-music" role="tab" aria-selected="false" aria-controls="view-music" tabindex="-1">音乐</button>
+    </div>
+    <div id="view-scene" role="tabpanel" aria-labelledby="tab-scene">
+      <section><h2>选择你的水下世界</h2><div id="background-options" class="background-options"></div><p id="background-status" class="note" role="status"></p></section>
+    </div>
+    <div id="view-fish" role="tabpanel" aria-labelledby="tab-fish" hidden>
+      <section><div class="section-heading"><h2>我的斗鱼</h2><span id="fish-count" aria-live="polite">0 / 5</span></div><div id="fish-list" class="fish-list" aria-label="选择要调整的斗鱼"></div><p class="note">点击画面，引导当前选中的斗鱼。</p></section>
+      <section><h2>多彩花纹</h2><div id="palette-options" class="palette-options"></div><button id="random-palette" class="random-palette" type="button">✧ 随机搭配花色</button><p class="note">浅色鱼身 · 彩色鳍根 · 深色尾缘<br>每次随机，都是一条不同的斗鱼。</p></section>
+      <section><h2>鳍的形状</h2><div id="shape-options" class="shape-options"></div></section>
+      <div class="actions"><button id="add-fish" class="primary" type="button" disabled>＋ 添加斗鱼</button><button id="remove-fish" type="button" disabled>移除选中</button></div>
+    </div>
+    <div id="view-music" role="tabpanel" aria-labelledby="tab-music" hidden>
+      <section><div class="section-heading"><h2>背景音乐</h2><span id="music-indicator">音乐已关闭</span></div>
+        <label class="field-label" for="music-source">曲目</label>
+        <select id="music-source"><option value="sea">海潮轻音</option><option value="moon">月光漂浮</option></select>
+        <button id="music-toggle" class="music-toggle" type="button" aria-pressed="false">播放音乐</button>
+      </section>
+      <section><div class="section-heading"><label for="music-volume" class="field-label">音量</label><output id="volume-value" for="music-volume">25%</output></div><input id="music-volume" type="range" min="0" max="100" value="25"></section>
+      <section class="local-music"><h2>你喜欢的音乐</h2><label class="upload-button" for="music-file">选择本地音乐</label><input id="music-file" class="file-input" type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.aiff"><p id="custom-file-name" class="note"></p><p class="note">仅在浏览器本地播放，不会上传。</p></section>
+      <p id="music-status" class="note" role="status"></p>
+      <audio id="background-audio" loop preload="none"></audio>
+    </div>
+  </aside>
+  <div id="gesture-hint" class="gesture-hint">点击水中，让斗鱼游向你<span>滚轮缩放 · 右上角切换场景</span></div>
+  <script type="module" src="./main.js"></script>
+  <script type="module" src="./music.js"></script>
+  <script type="module" src="./settings.js"></script>
+
+
+</body></html>
